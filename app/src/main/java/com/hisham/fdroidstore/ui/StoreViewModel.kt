@@ -20,14 +20,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 sealed class UiState {
-    object Idle : UiState()
-    object Loading : UiState()
+    data object Idle : UiState()
+    data object Loading : UiState()
     data class Results(val apps: List<SearchApp>) : UiState()
     data class Error(val message: String) : UiState()
 }
 
 class StoreViewModel(app: Application) : AndroidViewModel(app) {
-
     private val repository = FDroidRepository()
     private val downloader = ApkDownloader(app)
 
@@ -43,15 +42,17 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
     private val _downloadState = MutableStateFlow<DownloadState?>(null)
     val downloadState: StateFlow<DownloadState?> = _downloadState.asStateFlow()
 
-    private val _alternatives = MutableStateFlow<List<AlternativeSuggestion>?>(null)
-    val alternatives: StateFlow<List<AlternativeSuggestion>?> = _alternatives.asStateFlow()
-
-    // أقسام الاستعراض الافتراضية (تُعرض عندما لا يوجد بحث نشط)، بأسلوب مشابه لمتجر Play
     private val _browseSections = MutableStateFlow<Map<StoreCategory, List<SearchApp>>>(emptyMap())
     val browseSections: StateFlow<Map<StoreCategory, List<SearchApp>>> = _browseSections.asStateFlow()
 
     private val _browseLoading = MutableStateFlow(false)
     val browseLoading: StateFlow<Boolean> = _browseLoading.asStateFlow()
+
+    private val _favorites = MutableStateFlow<List<SearchApp>>(emptyList())
+    val favorites: StateFlow<List<SearchApp>> = _favorites.asStateFlow()
+
+    private val _alternatives = MutableStateFlow<List<AlternativeSuggestion>?>(null)
+    val alternatives: StateFlow<List<AlternativeSuggestion>?> = _alternatives.asStateFlow()
 
     init {
         loadBrowseSections()
@@ -61,12 +62,9 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
         _browseLoading.value = true
         viewModelScope.launch {
             try {
-                val results = StoreCategories.all.map { category ->
+                _browseSections.value = StoreCategories.all.map { category ->
                     async { category to repository.searchApps(category.searchQuery).take(8) }
-                }.awaitAll()
-                _browseSections.value = results.toMap()
-            } catch (e: Exception) {
-                // فشل تحميل الاستعراض الافتراضي ليس خطأ حرجًا؛ البحث اليدوي يبقى متاحًا
+                }.awaitAll().toMap()
             } finally {
                 _browseLoading.value = false
             }
@@ -79,29 +77,18 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
             _alternatives.value = null
             return
         }
-        // مطابقة محلية فورية مع خريطة البدائل، بدون أي طلب شبكة إضافي
         _alternatives.value = ProprietaryAlternatives.findFor(query)
-
         _uiState.value = UiState.Loading
         viewModelScope.launch {
             try {
-                val results = repository.searchApps(query)
-                _uiState.value = UiState.Results(results)
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "تعذّر الاتصال بمستودع F-Droid")
+                _uiState.value = UiState.Results(repository.searchApps(query))
+            } catch (error: Exception) {
+                _uiState.value = UiState.Error(error.message ?: "تعذّر الاتصال بمستودع F-Droid")
             }
         }
     }
 
-    /** يبحث مباشرة باسم البديل المقترح عند الضغط عليه */
-    fun searchAlternative(suggestion: AlternativeSuggestion) {
-        search(suggestion.searchQuery)
-    }
-
-    /** يفتح "عرض الكل" لفئة معيّنة من الشاشة الرئيسية */
-    fun openCategory(category: StoreCategory) {
-        search(category.searchQuery)
-    }
+    fun openCategory(category: StoreCategory) = search(category.searchQuery)
 
     fun openApp(app: SearchApp) {
         _selectedApp.value = app
@@ -109,9 +96,17 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 _packageDetails.value = repository.getPackageDetails(app.packageName)
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "تعذّر جلب تفاصيل التطبيق")
+            } catch (error: Exception) {
+                _uiState.value = UiState.Error(error.message ?: "تعذّر جلب تفاصيل التطبيق")
             }
+        }
+    }
+
+    fun toggleFavorite(app: SearchApp) {
+        _favorites.value = if (_favorites.value.any { it.packageName == app.packageName }) {
+            _favorites.value.filterNot { it.packageName == app.packageName }
+        } else {
+            listOf(app) + _favorites.value
         }
     }
 
@@ -123,17 +118,14 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
 
     fun downloadAndInstall() {
         val app = _selectedApp.value ?: return
-        val details = _packageDetails.value ?: return
-        val version = details.suggestedVersion ?: return
-        val url = repository.downloadUrlFor(app.packageName, version.versionCode)
-        val fileName = "${app.packageName}_${version.versionCode}.apk"
-
+        val version = _packageDetails.value?.suggestedVersion ?: return
         viewModelScope.launch {
-            downloader.download(url, fileName).collect { state ->
+            downloader.download(
+                repository.downloadUrlFor(app.packageName, version.versionCode),
+                "${app.packageName}_${version.versionCode}.apk"
+            ).collect { state ->
                 _downloadState.value = state
-                if (state is DownloadState.Done) {
-                    downloader.requestInstall(state.file)
-                }
+                if (state is DownloadState.Done) downloader.requestInstall(state.file)
             }
         }
     }
