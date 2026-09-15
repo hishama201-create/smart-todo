@@ -31,6 +31,7 @@ fun UpdatesScreen(
     updates: List<AppUpdate>,
     onRefresh: () -> Unit,
     onUpdate: (AppUpdate) -> Unit,
+    onUpdateAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(

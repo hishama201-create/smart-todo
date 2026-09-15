@@ -167,6 +167,22 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun updateAll() {
+        val pending = _updates.value
+        viewModelScope.launch {
+            pending.forEach { update ->
+                downloader.download(
+                    repository.downloadUrlFor(update.installed.packageName, update.latest.versionCode),
+                    "${update.installed.packageName}_${update.latest.versionCode}.apk"
+                ).collect { state ->
+                    _downloadState.value = state
+                    if (state is DownloadState.Done) downloader.requestInstall(state.file)
+                }
+            }
+            checkForUpdates(_installedApps.value)
+        }
+    }
+
     fun downloadAndInstallUpdate(update: AppUpdate) {
         viewModelScope.launch {
             downloader.download(
