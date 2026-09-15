@@ -14,6 +14,7 @@ import com.hisham.fdroidstore.data.FavoriteStore
 import com.hisham.fdroidstore.download.DownloadState
 import com.hisham.fdroidstore.model.PackageDetails
 import com.hisham.fdroidstore.model.InstalledApp
+import com.hisham.fdroidstore.model.AppUpdate
 import com.hisham.fdroidstore.model.SearchApp
 import com.hisham.fdroidstore.repository.FDroidRepository
 import kotlinx.coroutines.async
@@ -60,6 +61,9 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
     private val _installedApps = MutableStateFlow<List<InstalledApp>>(emptyList())
     val installedApps: StateFlow<List<InstalledApp>> = _installedApps.asStateFlow()
 
+    private val _updates = MutableStateFlow<List<AppUpdate>>(emptyList())
+    val updates: StateFlow<List<AppUpdate>> = _updates.asStateFlow()
+
     private val _alternatives = MutableStateFlow<List<AlternativeSuggestion>?>(null)
     val alternatives: StateFlow<List<AlternativeSuggestion>?> = _alternatives.asStateFlow()
 
@@ -86,7 +90,29 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 .sortedBy { it.name.lowercase() }
             _installedApps.value = installed
+            checkForUpdates(installed)
         }
+    }
+
+    private fun checkForUpdates(installed: List<InstalledApp>) {
+        viewModelScope.launch {
+            _updates.value = installed.map { app ->
+                async {
+                    runCatching {
+                        val latest = repository.getPackageDetails(app.packageName).suggestedVersion
+                        if (latest != null && latest.versionCode > app.versionCode) {
+                            AppUpdate(app, latest)
+                        } else {
+                            null
+                        }
+                    }.getOrNull()
+                }
+            }.awaitAll().filterNotNull()
+        }
+    }
+
+    fun refreshUpdates() {
+        checkForUpdates(_installedApps.value)
     }
 
     private fun loadBrowseSections() {
