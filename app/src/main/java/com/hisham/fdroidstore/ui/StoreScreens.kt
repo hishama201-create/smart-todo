@@ -1,4 +1,6 @@
 package com.hisham.fdroidstore.ui
+import android.net.Uri
+import android.content.Intent
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -68,6 +70,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.LayoutDirection
@@ -229,7 +232,7 @@ private fun HomeContent(
             is UiState.Error -> item { ErrorBlock(state.message) }
             is UiState.Results -> {
                 item { SectionHeader("نتائج البحث", null) }
-                if (state.apps.isEmpty()) item { EmptyBlock("لا توجد نتائج لهذا البحث") }
+                if (state.apps.isEmpty()) item { EmptyBlock("لا توجد نتائج لهذا البحث", query) }
                 items(state.apps) { app ->
                     AppRow(app, onClick = { onAppClick(app) }, onFavorite = { onFavorite(app) }, isFavorite = favorites.any { it.packageName == app.packageName })
                 }
@@ -510,9 +513,28 @@ private fun LoadingBlock() {
 }
 
 @Composable
-private fun EmptyBlock(message: String) {
-    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+private fun EmptyBlock(message: String, query: String? = null) {
+    val context = LocalContext.current
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text(message, color = AuroraColors.MutedPaper, fontSize = 14.sp)
+        if (!query.isNullOrBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    context.startActivity(
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://play.google.com/store/search?q=${Uri.encode(query)}&c=apps")
+                        )
+                    )
+                }
+            ) {
+                Text("فتح البحث الرسمي")
+            }
+        }
     }
 }
 
