@@ -3,6 +3,8 @@ package com.hisham.fdroidstore.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.hisham.fdroidstore.data.AlternativeSuggestion
+import com.hisham.fdroidstore.data.ProprietaryAlternatives
 import com.hisham.fdroidstore.download.ApkDownloader
 import com.hisham.fdroidstore.download.DownloadState
 import com.hisham.fdroidstore.model.PackageDetails
@@ -37,11 +39,18 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
     private val _downloadState = MutableStateFlow<DownloadState?>(null)
     val downloadState: StateFlow<DownloadState?> = _downloadState.asStateFlow()
 
+    private val _alternatives = MutableStateFlow<List<AlternativeSuggestion>?>(null)
+    val alternatives: StateFlow<List<AlternativeSuggestion>?> = _alternatives.asStateFlow()
+
     fun search(query: String) {
         if (query.isBlank()) {
             _uiState.value = UiState.Idle
+            _alternatives.value = null
             return
         }
+        // مطابقة محلية فورية مع خريطة البدائل، بدون أي طلب شبكة إضافي
+        _alternatives.value = ProprietaryAlternatives.findFor(query)
+
         _uiState.value = UiState.Loading
         viewModelScope.launch {
             try {
@@ -51,6 +60,11 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
                 _uiState.value = UiState.Error(e.message ?: "تعذّر الاتصال بمستودع F-Droid")
             }
         }
+    }
+
+    /** يبحث مباشرة باسم البديل المقترح عند الضغط عليه */
+    fun searchAlternative(suggestion: AlternativeSuggestion) {
+        search(suggestion.searchQuery)
     }
 
     fun openApp(app: SearchApp) {

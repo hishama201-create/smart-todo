@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.hisham.fdroidstore.data.AlternativeSuggestion
 import com.hisham.fdroidstore.download.DownloadState
 import com.hisham.fdroidstore.model.SearchApp
 
@@ -21,6 +22,7 @@ import com.hisham.fdroidstore.model.SearchApp
 fun StoreHomeScreen(viewModel: StoreViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedApp by viewModel.selectedApp.collectAsState()
+    val alternatives by viewModel.alternatives.collectAsState()
     var query by remember { mutableStateOf("") }
 
     Scaffold(
@@ -48,6 +50,13 @@ fun StoreHomeScreen(viewModel: StoreViewModel) {
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) { Text("بحث") }
 
+            alternatives?.let { suggestions ->
+                AlternativesBanner(
+                    suggestions = suggestions,
+                    onSuggestionClick = { viewModel.searchAlternative(it) }
+                )
+            }
+
             when (val state = uiState) {
                 is UiState.Idle -> HintText("ابحث عن اسم تطبيق، مثل: أدوات، ملاحظات، متصفح")
                 is UiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -61,6 +70,32 @@ fun StoreHomeScreen(viewModel: StoreViewModel) {
 
     if (selectedApp != null) {
         AppDetailSheet(viewModel = viewModel)
+    }
+}
+
+@Composable
+private fun AlternativesBanner(
+    suggestions: List<AlternativeSuggestion>,
+    onSuggestionClick: (AlternativeSuggestion) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "هذا التطبيق غير متوفر في المصادر المفتوحة، جرّب أحد هذه البدائل:",
+                style = MaterialTheme.typography.titleSmall
+            )
+            Spacer(Modifier.height(8.dp))
+            suggestions.forEach { suggestion ->
+                ListItem(
+                    headlineContent = { Text(suggestion.name) },
+                    supportingContent = { Text(suggestion.description) },
+                    modifier = Modifier.clickable { onSuggestionClick(suggestion) }
+                )
+            }
+        }
     }
 }
 
