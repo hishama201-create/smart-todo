@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hisham.fdroidstore.data.AlternativeSuggestion
+import com.hisham.fdroidstore.data.DownloadHistoryStore
 import com.hisham.fdroidstore.data.ProprietaryAlternatives
 import com.hisham.fdroidstore.data.StoreCategories
 import com.hisham.fdroidstore.data.StoreCategory
@@ -15,6 +16,7 @@ import com.hisham.fdroidstore.download.DownloadState
 import com.hisham.fdroidstore.model.PackageDetails
 import com.hisham.fdroidstore.model.InstalledApp
 import com.hisham.fdroidstore.model.AppUpdate
+import com.hisham.fdroidstore.model.DownloadRecord
 import com.hisham.fdroidstore.model.SearchApp
 import com.hisham.fdroidstore.repository.FDroidRepository
 import kotlinx.coroutines.async
@@ -35,6 +37,7 @@ sealed class UiState {
 class StoreViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = FDroidRepository()
     private val downloader = ApkDownloader(app)
+    private val downloadHistory = DownloadHistoryStore(app)
     private val favoritesStore = FavoriteStore(app)
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
@@ -64,6 +67,9 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
     private val _updates = MutableStateFlow<List<AppUpdate>>(emptyList())
     val updates: StateFlow<List<AppUpdate>> = _updates.asStateFlow()
 
+    private val _downloads = MutableStateFlow<List<DownloadRecord>>(downloadHistory.load())
+    val downloads: StateFlow<List<DownloadRecord>> = _downloads.asStateFlow()
+
     private val _alternatives = MutableStateFlow<List<AlternativeSuggestion>?>(null)
     val alternatives: StateFlow<List<AlternativeSuggestion>?> = _alternatives.asStateFlow()
 
@@ -83,7 +89,7 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
                         InstalledApp(
                             packageName = info.packageName,
                             name = packageManager.getApplicationLabel(info).toString(),
-                            versionName = packageInfo.versionName ?: "غير معروف"
+                            versionName = packageInfo.versionName ?: "غير معروف",
                             versionCode = packageInfo.versionCode.toLong(),
                         )
                     }.getOrNull()
@@ -176,7 +182,7 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
                     "${update.installed.packageName}_${update.latest.versionCode}.apk"
                 ).collect { state ->
                     _downloadState.value = state
-                    if (state is DownloadState.Done) downloader.requestInstall(state.file)
+                    if (state is DownloadState.Done) { downloadHistory.add(state.file.name); _downloads.value = downloadHistory.load(); downloader.requestInstall(state.file) }
                 }
             }
             checkForUpdates(_installedApps.value)
@@ -190,7 +196,7 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
                 "${update.installed.packageName}_${update.latest.versionCode}.apk"
             ).collect { state ->
                 _downloadState.value = state
-                if (state is DownloadState.Done) downloader.requestInstall(state.file)
+                if (state is DownloadState.Done) { downloadHistory.add(state.file.name); _downloads.value = downloadHistory.load(); downloader.requestInstall(state.file) }
             }
         }
     }
@@ -210,7 +216,7 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
                 "${app.packageName}_${version.versionCode}.apk"
             ).collect { state ->
                 _downloadState.value = state
-                if (state is DownloadState.Done) downloader.requestInstall(state.file)
+                if (state is DownloadState.Done) { downloadHistory.add(state.file.name); _downloads.value = downloadHistory.load(); downloader.requestInstall(state.file) }
             }
         }
     }
