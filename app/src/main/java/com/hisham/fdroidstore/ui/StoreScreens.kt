@@ -40,6 +40,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -424,6 +425,7 @@ private fun AppRow(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun AppDetailSheet(viewModel: StoreViewModel, isFavorite: Boolean) {
     val app by viewModel.selectedApp.collectAsState()
     val details by viewModel.packageDetails.collectAsState()
