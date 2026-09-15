@@ -167,6 +167,18 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun downloadAndInstallUpdate(update: AppUpdate) {
+        viewModelScope.launch {
+            downloader.download(
+                repository.downloadUrlFor(update.installed.packageName, update.latest.versionCode),
+                "${update.installed.packageName}_${update.latest.versionCode}.apk"
+            ).collect { state ->
+                _downloadState.value = state
+                if (state is DownloadState.Done) downloader.requestInstall(state.file)
+            }
+        }
+    }
+
     fun closeDetails() {
         _selectedApp.value = null
         _packageDetails.value = null

@@ -99,6 +99,8 @@ fun StoreHomeScreen(viewModel: StoreViewModel) {
     val browseSections by viewModel.browseSections.collectAsState()
     val browseLoading by viewModel.browseLoading.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
+    val installedApps by viewModel.installedApps.collectAsState()
+    val updates by viewModel.updates.collectAsState()
     var query by remember { mutableStateOf("") }
     var selectedTab by remember { mutableIntStateOf(0) }
 
