@@ -229,6 +229,22 @@ private fun HomeContent(
                 )
             )
         }
+        if (query.isBlank()) {
+            item {
+                Text("اقتراحات البحث", color = AuroraColors.Paper, fontWeight = FontWeight.SemiBold)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    items(listOf("واتساب", "يوتيوب", "متصفح", "موسيقى", "خصوصية")) { suggestion ->
+                        Button(onClick = { onQueryChange(suggestion); onSearch() }) {
+                            Text(suggestion, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+
         when (val state = uiState) {
             is UiState.Loading -> item { LoadingBlock() }
             is UiState.Error -> item { ErrorBlock(state.message) }
