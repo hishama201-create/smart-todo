@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.Modifier
+import com.hisham.fdroidstore.ui.AuroraColors
 import com.hisham.fdroidstore.ui.StoreHomeScreen
 import com.hisham.fdroidstore.ui.StoreViewModel
 
