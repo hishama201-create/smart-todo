@@ -1,6 +1,8 @@
 package com.hisham.fdroidstore.ui
 
 import android.app.Application
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hisham.fdroidstore.data.AlternativeSuggestion
@@ -8,11 +10,14 @@ import com.hisham.fdroidstore.data.ProprietaryAlternatives
 import com.hisham.fdroidstore.data.StoreCategories
 import com.hisham.fdroidstore.data.StoreCategory
 import com.hisham.fdroidstore.download.ApkDownloader
+import com.hisham.fdroidstore.data.FavoriteStore
 import com.hisham.fdroidstore.download.DownloadState
 import com.hisham.fdroidstore.model.PackageDetails
+import com.hisham.fdroidstore.model.InstalledApp
 import com.hisham.fdroidstore.model.SearchApp
 import com.hisham.fdroidstore.repository.FDroidRepository
 import kotlinx.coroutines.async
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +34,7 @@ sealed class UiState {
 class StoreViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = FDroidRepository()
     private val downloader = ApkDownloader(app)
+    private val favoritesStore = FavoriteStore(app)
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -48,14 +54,39 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
     private val _browseLoading = MutableStateFlow(false)
     val browseLoading: StateFlow<Boolean> = _browseLoading.asStateFlow()
 
-    private val _favorites = MutableStateFlow<List<SearchApp>>(emptyList())
+    private val _favorites = MutableStateFlow(favoritesStore.load())
     val favorites: StateFlow<List<SearchApp>> = _favorites.asStateFlow()
+
+    private val _installedApps = MutableStateFlow<List<InstalledApp>>(emptyList())
+    val installedApps: StateFlow<List<InstalledApp>> = _installedApps.asStateFlow()
 
     private val _alternatives = MutableStateFlow<List<AlternativeSuggestion>?>(null)
     val alternatives: StateFlow<List<AlternativeSuggestion>?> = _alternatives.asStateFlow()
 
     init {
+        loadInstalledApps()
         loadBrowseSections()
+    }
+
+    private fun loadInstalledApps() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val packageManager = getApplication<Application>().packageManager
+            val installed = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+                .filter { (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 }
+                .mapNotNull { info ->
+                    runCatching {
+                        val packageInfo = packageManager.getPackageInfo(info.packageName, 0)
+                        InstalledApp(
+                            packageName = info.packageName,
+                            name = packageManager.getApplicationLabel(info).toString(),
+                            versionName = packageInfo.versionName ?: "غير معروف"
+                            versionCode = packageInfo.versionCode.toLong(),
+                        )
+                    }.getOrNull()
+                }
+                .sortedBy { it.name.lowercase() }
+            _installedApps.value = installed
+        }
     }
 
     private fun loadBrowseSections() {
