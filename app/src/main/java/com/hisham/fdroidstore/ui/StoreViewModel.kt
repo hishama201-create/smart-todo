@@ -5,11 +5,15 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hisham.fdroidstore.data.AlternativeSuggestion
 import com.hisham.fdroidstore.data.ProprietaryAlternatives
+import com.hisham.fdroidstore.data.StoreCategories
+import com.hisham.fdroidstore.data.StoreCategory
 import com.hisham.fdroidstore.download.ApkDownloader
 import com.hisham.fdroidstore.download.DownloadState
 import com.hisham.fdroidstore.model.PackageDetails
 import com.hisham.fdroidstore.model.SearchApp
 import com.hisham.fdroidstore.repository.FDroidRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +46,33 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
     private val _alternatives = MutableStateFlow<List<AlternativeSuggestion>?>(null)
     val alternatives: StateFlow<List<AlternativeSuggestion>?> = _alternatives.asStateFlow()
 
+    // أقسام الاستعراض الافتراضية (تُعرض عندما لا يوجد بحث نشط)، بأسلوب مشابه لمتجر Play
+    private val _browseSections = MutableStateFlow<Map<StoreCategory, List<SearchApp>>>(emptyMap())
+    val browseSections: StateFlow<Map<StoreCategory, List<SearchApp>>> = _browseSections.asStateFlow()
+
+    private val _browseLoading = MutableStateFlow(false)
+    val browseLoading: StateFlow<Boolean> = _browseLoading.asStateFlow()
+
+    init {
+        loadBrowseSections()
+    }
+
+    private fun loadBrowseSections() {
+        _browseLoading.value = true
+        viewModelScope.launch {
+            try {
+                val results = StoreCategories.all.map { category ->
+                    async { category to repository.searchApps(category.searchQuery).take(8) }
+                }.awaitAll()
+                _browseSections.value = results.toMap()
+            } catch (e: Exception) {
+                // فشل تحميل الاستعراض الافتراضي ليس خطأ حرجًا؛ البحث اليدوي يبقى متاحًا
+            } finally {
+                _browseLoading.value = false
+            }
+        }
+    }
+
     fun search(query: String) {
         if (query.isBlank()) {
             _uiState.value = UiState.Idle
@@ -65,6 +96,11 @@ class StoreViewModel(app: Application) : AndroidViewModel(app) {
     /** يبحث مباشرة باسم البديل المقترح عند الضغط عليه */
     fun searchAlternative(suggestion: AlternativeSuggestion) {
         search(suggestion.searchQuery)
+    }
+
+    /** يفتح "عرض الكل" لفئة معيّنة من الشاشة الرئيسية */
+    fun openCategory(category: StoreCategory) {
+        search(category.searchQuery)
     }
 
     fun openApp(app: SearchApp) {

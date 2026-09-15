@@ -14,6 +14,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.hisham.fdroidstore.data.AlternativeSuggestion
+import com.hisham.fdroidstore.data.StoreCategory
 import com.hisham.fdroidstore.download.DownloadState
 import com.hisham.fdroidstore.model.SearchApp
 
@@ -23,6 +24,8 @@ fun StoreHomeScreen(viewModel: StoreViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedApp by viewModel.selectedApp.collectAsState()
     val alternatives by viewModel.alternatives.collectAsState()
+    val browseSections by viewModel.browseSections.collectAsState()
+    val browseLoading by viewModel.browseLoading.collectAsState()
     var query by remember { mutableStateOf("") }
 
     Scaffold(
@@ -58,7 +61,12 @@ fun StoreHomeScreen(viewModel: StoreViewModel) {
             }
 
             when (val state = uiState) {
-                is UiState.Idle -> HintText("ابحث عن اسم تطبيق، مثل: أدوات، ملاحظات، متصفح")
+                is UiState.Idle -> BrowseSections(
+                    sections = browseSections,
+                    loading = browseLoading,
+                    onCategoryClick = { viewModel.openCategory(it) },
+                    onAppClick = { viewModel.openApp(it) }
+                )
                 is UiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
@@ -94,6 +102,90 @@ private fun AlternativesBanner(
                     supportingContent = { Text(suggestion.description) },
                     modifier = Modifier.clickable { onSuggestionClick(suggestion) }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseSections(
+    sections: Map<StoreCategory, List<SearchApp>>,
+    loading: Boolean,
+    onCategoryClick: (StoreCategory) -> Unit,
+    onAppClick: (SearchApp) -> Unit
+) {
+    if (loading && sections.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+    if (sections.isEmpty()) {
+        HintText("ابحث عن اسم تطبيق، مثل: أدوات، ملاحظات، متصفح")
+        return
+    }
+
+    LazyColumn {
+        sections.forEach { (category, apps) ->
+            if (apps.isNotEmpty()) {
+                item {
+                    CategorySection(category, apps, onCategoryClick, onAppClick)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategorySection(
+    category: StoreCategory,
+    apps: List<SearchApp>,
+    onCategoryClick: (StoreCategory) -> Unit,
+    onAppClick: (SearchApp) -> Unit
+) {
+    Column(Modifier.padding(vertical = 8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .clickable { onCategoryClick(category) },
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "${category.emoji} ${category.title}",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                "عرض الكل",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        androidx.compose.foundation.lazy.LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(apps) { app ->
+                Column(
+                    modifier = Modifier
+                        .width(96.dp)
+                        .clickable { onAppClick(app) }
+                ) {
+                    AsyncImage(
+                        model = app.icon,
+                        contentDescription = app.name,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        app.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2
+                    )
+                }
             }
         }
     }
