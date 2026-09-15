@@ -437,6 +437,7 @@ private fun AppDetailSheet(viewModel: StoreViewModel, isFavorite: Boolean) {
     val downloadState by viewModel.downloadState.collectAsState()
     val current = app ?: return
     val version = details?.suggestedVersion
+    val context = LocalContext.current
 
     ModalBottomSheet(
         onDismissRequest = { viewModel.closeDetails() },
@@ -459,6 +460,37 @@ private fun AppDetailSheet(viewModel: StoreViewModel, isFavorite: Boolean) {
             }
             Spacer(Modifier.height(18.dp))
             Text(current.summary, color = AuroraColors.MutedPaper, fontSize = 15.sp)
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://f-droid.org/packages/${current.packageName}/")
+                            )
+                        )
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("الصفحة الرسمية")
+                }
+                Button(
+                    onClick = {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, "https://f-droid.org/packages/${current.packageName}/")
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "مشاركة التطبيق"))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("مشاركة")
+                }
+            }
             Spacer(Modifier.height(19.dp))
             if (details == null) {
                 CircularProgressIndicator(color = AuroraColors.Mint)
