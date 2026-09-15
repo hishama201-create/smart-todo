@@ -464,6 +464,13 @@ private fun AppDetailSheet(viewModel: StoreViewModel, isFavorite: Boolean) {
                 Text("لا توجد إصدارات متاحة", color = AuroraColors.Coral)
             } else {
                 Text("أحدث إصدار: ${version.versionName}", color = AuroraColors.Paper, fontWeight = FontWeight.SemiBold)
+                if (details?.packages.orEmpty().size > 1) {
+                    Spacer(Modifier.height(12.dp))
+                    Text("الإصدارات المتاحة", color = AuroraColors.Paper, fontWeight = FontWeight.SemiBold)
+                    details?.packages.orEmpty().sortedByDescending { it.versionCode }.take(5).forEach { release ->
+                        Text("${release.versionName} (${release.versionCode})", color = AuroraColors.MutedPaper, fontSize = 13.sp)
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
                 when (val state = downloadState) {
                     is DownloadState.Progress -> {
